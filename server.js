@@ -1,13 +1,15 @@
 const express = require("express");
 const cors = require("cors");
 const Stripe = require("stripe");
-require("dotenv").config();
+
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+console.log("ENV KEY:", process.env.STRIPE_SECRET_KEY);
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+console.log("STRIPE KEY EXISTS:", !!process.env.STRIPE_SECRET_KEY);
 
 // Test
 app.get("/", (req, res) => {
