@@ -1,111 +1,69 @@
-const express = require("express");
-const cors = require("cors");
-const Stripe = require("stripe");
+import express from "express";
+import cors from "cors";
+import Stripe from "stripe";
+import dotenv from "dotenv";
 
+dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-console.log("ENV KEY:", process.env.STRIPE_SECRET_KEY);
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-console.log("STRIPE KEY EXISTS:", !!process.env.STRIPE_SECRET_KEY);
+// 🔥 Stripe init
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Test
+// 🔥 TEST ROUTE
 app.get("/", (req, res) => {
   res.send("BookLocal Stripe backend is running");
 });
 
-// 1) Tourist payment: HOLD money
+// 🔥 CREATE PAYMENT INTENT (SODDA VERSION)
 app.post("/create-payment-intent", async (req, res) => {
   try {
-    const { amount, bookingId, guideStripeAccountId } = req.body;
+    const { amount, bookingId } = req.body;
 
-    if (!amount || amount < 50) {
+    if (!amount || amount < 1) {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    if (!guideStripeAccountId) {
-      return res.status(400).json({ error: "Missing guide Stripe account ID" });
-    }
-
+    // Stripe cents ishlatadi
     const amountInCents = amount * 100;
-    const platformFee = Math.round(amountInCents * 0.20);
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: "usd",
+
+      // 🔥 MUHIM — HOLD SYSTEM
       capture_method: "manual",
+
       automatic_payment_methods: {
         enabled: true,
       },
-      application_fee_amount: platformFee,
-      transfer_data: {
-        destination: guideStripeAccountId,
-      },
+
       metadata: {
         bookingId: bookingId || "",
-        platformFee: platformFee.toString(),
-        guideShare: (amountInCents - platformFee).toString(),
       },
     });
+
+    console.log("✅ PaymentIntent created:", paymentIntent.id);
 
     res.json({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
     });
+
   } catch (error) {
-    console.error("create-payment-intent error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+    console.error("❌ Stripe error:", error.message);
 
-// 2) Complete service: CAPTURE money
-app.post("/capture-payment", async (req, res) => {
-  try {
-    const { paymentIntentId } = req.body;
-
-    if (!paymentIntentId) {
-      return res.status(400).json({ error: "Missing paymentIntentId" });
-    }
-
-    const captured = await stripe.paymentIntents.capture(paymentIntentId);
-
-    res.json({
-      success: true,
-      status: captured.status,
-      paymentIntentId: captured.id,
+    res.status(500).json({
+      error: error.message,
     });
-  } catch (error) {
-    console.error("capture-payment error:", error);
-    res.status(500).json({ error: error.message });
   }
 });
 
-// 3) Cancel/refund hold
-app.post("/cancel-payment", async (req, res) => {
-  try {
-    const { paymentIntentId } = req.body;
-
-    if (!paymentIntentId) {
-      return res.status(400).json({ error: "Missing paymentIntentId" });
-    }
-
-    const canceled = await stripe.paymentIntents.cancel(paymentIntentId);
-
-    res.json({
-      success: true,
-      status: canceled.status,
-      paymentIntentId: canceled.id,
-    });
-  } catch (error) {
-    console.error("cancel-payment error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-const PORT = process.env.PORT || 8080;
+// 🔥 PORT
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`BookLocal backend running on port ${PORT}`);
+  console.log(`🚀 BookLocal backend running on port ${PORT}`);
 });
